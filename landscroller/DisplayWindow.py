@@ -15,7 +15,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         # ImageGen and viewport sizes
         self.eval_width = 1024  # ***** Coupled to G()
         self.eval_height = 1024 # ***** Coupled to G()
-        self.scale = 512 / self.eval_height
+        self.scale = 1024 / self.eval_height
         self.patch_height = self.eval_height * self.scale
         self.patch_width = self.eval_width * self.scale
         self.height = self.patch_height
@@ -27,9 +27,11 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.n = 0
         self.nn = 0
         self.pimg = None
-        # These next two are because the very first pull from the model returns two patches
-        self.prediction_count = 1
-        self.prefetch_count = -1
+        # ** (NS-Outpainting) These next two are -1 because the very first pull from the model returns two patches
+        # self.prediction_count = 1
+        # self.prefetch_count = -1
+        self.prediction_count = 0
+        self.prefetch_count = 0
 
         # Time related
         self.start_time = time.time()
@@ -104,7 +106,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         # Adjust prefetch if buffer size has changed
         if self.last_buffer_size != buf_siz:
             if self.last_buffer_size == -1:
-                self.prefetch_count = buf_siz - 1 # Very first prediction is double-wide
+                self.prefetch_count = buf_siz #- 1 # ** Very first prediction is double-wide in NS-Outpaint
             else:
                 self.prefetch_count = max(0,  self.prefetch_count + (buf_siz - self.last_buffer_size))
             self.last_buffer_size = buf_siz
@@ -172,8 +174,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
     def shuffle(self):
         self.app.shuffle_flag.set(True)
         self.prefetch_count = self.app.buffer_size.get() + 2 # Empty the queued and buffered images ASAP
-        self.prediction_count = -1
-        self.nn = -1
+        self.prediction_count = 0 # ** -1 in NS-Outpaint
+        self.nn = 0 # ** -1 in NS-Outpaint
 
 def preview_save(img, name):
     pw = tk.Toplevel()

@@ -74,23 +74,22 @@ def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash
     curr_ws_context = torch.stack([ws[curr_w_idx - 1].unsqueeze(0), ws[curr_w_idx + 1].unsqueeze(0)], dim=1)
     while not shuffle_flag.get() : #***** TEMP - just trying to get 5 patches
  
-      if shift == w_range:
-        shift = 0
-        new_z =  torch.randn(1, G.z_dim).to(device) # ** Seed stability could be implemented as new_ws =  curr_ws + ss * rand?
-        new_ws = G.mapping(new_z, c=None, modes_idx=modes_idx)
-        ws.append(new_ws)
-        ws.pop(0)
-        curr_w_idx += 1
+      if shift % w_range == 0:
+        new_z =  torch.randn(2, G.z_dim).to(device) # ** Seed stability could be implemented as new_ws =  curr_ws + ss * rand?
+        new_ws = G.mapping(new_z, c=None, modes_idx=torch.zeros(1).long().to(device))
+        ws = torch.cat((ws, new_ws))
+        # ** Should drop oldest ws
+        curr_w_idx += 2
         curr_ws = ws[curr_w_idx].unsqueeze(0)
         curr_ws_context = torch.stack([ws[curr_w_idx - 1].unsqueeze(0), ws[curr_w_idx + 1].unsqueeze(0)], dim=1)
 
-      curr_left_borders_idx = torch.zeros(1, device=zs.device).long() + (shift % w_range)
+      curr_left_borders_idx = torch.zeros(1, device=zs.device).long() + (shift % w_range)  #** What does this do?
 
       img = G.synthesis(curr_ws, ws_context=curr_ws_context, left_borders_idx=curr_left_borders_idx, noise='const')
 
       imgs.append(img[0].cpu().clamp(-1, 1) * 0.5 + 0.5)
 
-      if len(imgs) / 1024 >= buffer_size.get():
+      if len(imgs) > buffer_size.get():
         imgs.pop(0)
 
       img_callback(TVF.to_pil_image(torch.cat(imgs, dim=2)))
