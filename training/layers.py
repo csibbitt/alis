@@ -552,7 +552,7 @@ def generate_coords(batch_size: int, img_size: int, device='cpu', align_corners:
 
 def generate_logarithmic_basis(
     resolution: int,
-    max_num_feats: int=np.float('inf'),
+    max_num_feats: int=float('inf'),
     remove_lowest_freq: bool=False,
     use_diagonal: bool=True) -> Tensor:
     """
