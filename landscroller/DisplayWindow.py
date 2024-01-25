@@ -69,13 +69,13 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
     def adjust_canvas_width(self, buf_siz):
         # Adjust scroll region if virtual canvas size has changed
         new_canvas_vwidth = buf_siz * self.eval_width * self.scale
-        if new_canvas_vwidth != self.vwidth:
-            self.vwidth = new_canvas_vwidth
-            self.children['!canvas'].configure(width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
+        #if new_canvas_vwidth != self.vwidth:
+        self.vwidth = new_canvas_vwidth
+        self.children['!canvas'].configure(width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
 
     def run(self):
         self.title("landscroller - Display")
-        self.geometry(f'{self.width}x{self.height + 15}+0+0')
+        self.geometry(f'{self.width}x{self.height}+0+0')
 
         canvas = tk.Canvas(self, width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
         canvas.pack(fill="both", expand=True)
@@ -103,7 +103,6 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.wait_window
 
     def update(self):
-        if self.app.paused.get(): self.after(int(250), self.update); return
 
         buf_siz = self.app.buffer_size.get()
 
@@ -124,6 +123,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         # If we need to fetch more images
         if self.prefetch_count > 0:
             self.get_next_image(buf_siz)
+
+        if self.app.paused.get(): self.after(int(250), self.update); return
 
         # Scroll 1px and maintain leading edge
         cw = self.children['!canvas'].winfo_width()
@@ -166,8 +167,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         name = f'outputs/view-{int(self.start_time)}-{self.app.input_hash.get()}-n{self.nn}-({self.app.predictions_string.get()}).jpg'
         cw = self.children['!canvas'].winfo_width()
         with self.last_img_lock:
-            start_col = self.children['!canvas'].xview()[0] * self.last_img.width
-            cropped = self.last_img.crop( (start_col, 0, start_col + (cw / self.scale), self.eval_height) )
+            start_col = self.children['!canvas'].xview()[0] * self.current_img.width
+            cropped = self.current_img.crop( (start_col, 0, start_col + (cw / self.scale), self.eval_height) )
             cropped.save(name)
             preview_save(cropped, name)
         self.app.status.set('Saved viewport')
@@ -178,8 +179,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.app.paused.set(True)
         name = f'outputs/buf-{int(self.start_time)}-{self.app.input_hash.get()}-n{self.nn}-({self.app.predictions_string.get()}).jpg'
         with self.last_img_lock:
-            self.last_img.save(name)
-            preview_save(self.last_img, name)
+            self.current_img.save(name)
+            preview_save(self.current_img, name)
         self.app.status.set('Saved buffer')
         self.app.paused.set(prev_pause)
 
