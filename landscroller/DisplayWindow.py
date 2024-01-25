@@ -27,9 +27,6 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.n = 0
         self.nn = 0
         self.pimg = None
-        # ** (NS-Outpainting) These next two are -1 because the very first pull from the model returns two patches
-        # self.prediction_count = 1
-        # self.prefetch_count = -1
         self.prediction_count = 0
         self.prefetch_count = 0
 
@@ -47,9 +44,9 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.start()
 
     def eval_callback(self, img):
-        if self.prediction_count == 1:
+        if self.prediction_count == 0:
             label = self.app.control_window.seed_preview_label
-            label.image = ImageTk.PhotoImage(img.crop((0,0,128,128)).resize((32,32)))
+            label.image = ImageTk.PhotoImage(img.crop((0,0,1024,1024)).resize((32,32)))
             label.config(image=label.image)
 
         simg = ImageTk.PhotoImage(img.resize((int(img.width * self.scale), int(img.height * self.scale))))
@@ -61,9 +58,16 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.current_img = img
         time.sleep(0.25)
 
+    def on_resize(self, event):
+        if event.height <= 15:
+            return
+        self.height = event.height - 15 # 15 is the scrollbar height
+        self.scale = self.height / self.eval_height
+        self.children['!canvas'].configure(height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
+
     def run(self):
         self.title("landscroller - Display")
-        self.geometry('+0+0')
+        self.geometry('1920x1039+0+0')
 
         canvas = tk.Canvas(self, width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
         canvas.pack(fill="both", expand=True)
@@ -74,6 +78,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         scrollbar_x = tk.Scrollbar(self, orient="horizontal", command=canvas.xview)
         scrollbar_x.pack(side="bottom", fill="x")
         canvas.configure(xscrollcommand=scrollbar_x.set)
+
+        #self.bind("<Configure>", self.on_resize)
 
         # Prevent closing
         def on_closing():
@@ -93,7 +99,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
 
         buf_siz = self.app.buffer_size.get()
 
-        # Adjust scroll region if canvas size has changed
+        # Adjust scroll region if virtual canvas size has changed
         new_canvas_vwidth = buf_siz * self.eval_width * self.scale
         if new_canvas_vwidth != self.vwidth:
             self.vwidth = new_canvas_vwidth
@@ -174,8 +180,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
     def shuffle(self):
         self.app.shuffle_flag.set(True)
         self.prefetch_count = self.app.buffer_size.get() + 2 # Empty the queued and buffered images ASAP
-        self.prediction_count = 0 # ** -1 in NS-Outpaint
-        self.nn = 0 # ** -1 in NS-Outpaint
+        self.prediction_count = 0
+        self.nn = 0
 
 def preview_save(img, name):
     pw = tk.Toplevel()

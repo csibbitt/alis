@@ -62,6 +62,13 @@ def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash
       modes_idx = (torch.ones(1, device=zs.device).repeat(num_ws).float() * mode_idx).long()
       ws = G.mapping(zs, c=None, modes_idx=modes_idx)  # [num_ws, 19, 512]
       seed_hash.set('t_' + input_hasher(ws))
+
+      # Truncating
+      z_mean = torch.randn(1000, G.z_dim).to(device)
+      ws_proto = G.mapping(z_mean, c=None, modes_idx=modes_idx[0]).mean(dim=0, keepdim=True)
+      truncation_factor = 1 - (mix_strength.get() / 100)
+      ws = ws * truncation_factor + (1 - truncation_factor) * ws_proto
+
     else:
       #** Project input_images to Wl, Wc, Wr
       # ***** How?
@@ -72,14 +79,16 @@ def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash
     curr_w_idx = 1
     curr_ws = ws[curr_w_idx].unsqueeze(0)
     curr_ws_context = torch.stack([ws[curr_w_idx - 1].unsqueeze(0), ws[curr_w_idx + 1].unsqueeze(0)], dim=1)
-    while not shuffle_flag.get() : #***** TEMP - just trying to get 5 patches
- 
+    while not shuffle_flag.get():
+
+      truncation_factor = 1 - (mix_strength.get() / 100)
+
       if shift % w_range == 0:
-        new_z =  torch.randn(2, G.z_dim).to(device) # ** Seed stability could be implemented as new_ws =  curr_ws + ss * rand?
+        new_z =  torch.randn(2, G.z_dim).to(device)
         new_ws = G.mapping(new_z, c=None, modes_idx=torch.zeros(1).long().to(device))
-        ws = torch.cat((ws, new_ws))
-        # ** Should drop oldest ws
-        curr_w_idx += 2
+        new_ws = new_ws * truncation_factor + (1 - truncation_factor) * ws_proto
+        ws = torch.cat((ws[1:], new_ws))
+        curr_w_idx += 1
         curr_ws = ws[curr_w_idx].unsqueeze(0)
         curr_ws_context = torch.stack([ws[curr_w_idx - 1].unsqueeze(0), ws[curr_w_idx + 1].unsqueeze(0)], dim=1)
 
@@ -97,8 +106,8 @@ def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash
     shuffle_flag.set(False)
 
 def mainSessionMock(buffer_size, img_callback, shuffle_flag, input_images, seed_hash, mix_strength):
-    eval_width = 128
-    eval_height = 128
+    eval_width = 1024
+    eval_height = 1024
     file_list = glob('mock_images/endless*.jpg')
     while True:
         random.shuffle(file_list)
@@ -111,10 +120,10 @@ def mainSessionMock(buffer_size, img_callback, shuffle_flag, input_images, seed_
             if first:
                 # The first frame is double-wide
                 img_callback(mockImage.crop((0, 0, eval_width * 2, eval_height)))
-                prediction_count = 2
+                prediction_count = 1
                 first = False
             else:
                 prediction_count += 1
-                start_column = 128 * (prediction_count - buffer_size.get()) if prediction_count >= buffer_size.get() else 0
+                start_column = 1024 * (prediction_count - buffer_size.get()) if prediction_count >= buffer_size.get() else 0
                 img_callback(mockImage.crop((start_column, 0, prediction_count * eval_width, eval_height)))
         shuffle_flag.set(False)

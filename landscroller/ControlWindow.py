@@ -42,7 +42,7 @@ class ControlWindow():
 
         fps_frame = tk.Frame(self.app)
         fps_frame.grid(row=2, column=1, columnspan=2, sticky="w")
-        fps_spinbox = tk.Spinbox(fps_frame, from_=0.001, to=240, width=5, textvariable=self.app.fps, validate="key", validatecommand=(tk_vsi, '%P'))
+        fps_spinbox = tk.Spinbox(fps_frame, from_=1, to=240, width=5, textvariable=self.app.fps, validate="key", validatecommand=(tk_vsi, '%P'))
         fps_spinbox.grid(row=0, column=1, sticky="w")
         fps_label = tk.Label(fps_frame, textvariable=self.app.avg_fps)
         fps_label.grid(row=0, column=2, sticky="w")
