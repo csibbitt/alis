@@ -15,11 +15,10 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         # ImageGen and viewport sizes
         self.eval_width = 1024  # ***** Coupled to G()
         self.eval_height = 1024 # ***** Coupled to G()
-        self.scale = 1024 / self.eval_height
-        self.patch_height = self.eval_height * self.scale
-        self.patch_width = self.eval_width * self.scale
-        self.height = self.patch_height
         self.width = 1920
+        self.height = self.eval_height
+
+        self.scale = self.height / self.eval_height
         self.vwidth = self.eval_width * self.app.buffer_size.get() * self.scale
 
         # Instance vars
@@ -63,11 +62,11 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
             return
         self.height = event.height - 15 # 15 is the scrollbar height
         self.scale = self.height / self.eval_height
-        self.children['!canvas'].configure(height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
+        self.children['!canvas'].configure(width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
 
     def run(self):
         self.title("landscroller - Display")
-        self.geometry('1920x1039+0+0')
+        self.geometry(f'{self.width}x{self.height}+0+0')
 
         canvas = tk.Canvas(self, width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
         canvas.pack(fill="both", expand=True)
@@ -79,7 +78,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         scrollbar_x.pack(side="bottom", fill="x")
         canvas.configure(xscrollcommand=scrollbar_x.set)
 
-        #self.bind("<Configure>", self.on_resize)
+        self.bind("<Configure>", self.on_resize)
 
         # Prevent closing
         def on_closing():
@@ -106,7 +105,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
             self.children['!canvas'].configure(scrollregion=(0, 0, self.vwidth, self.height))
 
         # Fetch another image if we've scrolled a full width
-        if self.n > self.patch_width:
+        if self.n > self.eval_width * self.scale:
             self.n = 0; self.prefetch_count += 1
 
         # Adjust prefetch if buffer size has changed
@@ -123,7 +122,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
 
         # Scroll 1px and maintain leading edge
         cw = self.children['!canvas'].winfo_width()
-        self.children['!canvas'].xview_moveto( ( ( ((self.vwidth/cw) - 1)/(self.vwidth/cw) * self.vwidth ) - self.patch_width + self.n) / self.vwidth)  # Do you believe in magic?
+        self.children['!canvas'].xview_moveto( ( ( ((self.vwidth/cw) - 1)/(self.vwidth/cw) * self.vwidth ) - (self.eval_width * self.scale) + self.n) / self.vwidth)  # Do you believe in magic?
 
         # Next update scheduling calculations
         l_fps = self.app.fps.get()
