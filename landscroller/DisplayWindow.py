@@ -48,10 +48,9 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
             label.image = ImageTk.PhotoImage(img.crop((0,0,1024,1024)).resize((32,32)))
             label.config(image=label.image)
 
-        simg = ImageTk.PhotoImage(img.resize((int(img.width * self.scale), int(img.height * self.scale))))
         while len(self.img_q) >= self.img_q.maxlen:
             time.sleep(0.25)
-        self.img_q.append(simg)
+        self.img_q.append(img)
         with self.last_img_lock:
             self.last_img = self.current_img
         self.current_img = img
@@ -62,11 +61,21 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
             return
         self.height = event.height - 15 # 15 is the scrollbar height
         self.scale = self.height / self.eval_height
-        self.children['!canvas'].configure(width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
+        img = self.current_img
+        self.pimg = ImageTk.PhotoImage(img.resize((int(img.width * self.scale), int(img.height * self.scale))))
+        self.adjust_canvas_width(self.app.buffer_size.get())
+        self.children['!canvas'].itemconfigure(self.canvas_image_id, image=self.pimg)
+
+    def adjust_canvas_width(self, buf_siz):
+        # Adjust scroll region if virtual canvas size has changed
+        new_canvas_vwidth = buf_siz * self.eval_width * self.scale
+        if new_canvas_vwidth != self.vwidth:
+            self.vwidth = new_canvas_vwidth
+            self.children['!canvas'].configure(width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
 
     def run(self):
         self.title("landscroller - Display")
-        self.geometry(f'{self.width}x{self.height}+0+0')
+        self.geometry(f'{self.width}x{self.height + 15}+0+0')
 
         canvas = tk.Canvas(self, width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
         canvas.pack(fill="both", expand=True)
@@ -98,11 +107,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
 
         buf_siz = self.app.buffer_size.get()
 
-        # Adjust scroll region if virtual canvas size has changed
-        new_canvas_vwidth = buf_siz * self.eval_width * self.scale
-        if new_canvas_vwidth != self.vwidth:
-            self.vwidth = new_canvas_vwidth
-            self.children['!canvas'].configure(scrollregion=(0, 0, self.vwidth, self.height))
+        self.adjust_canvas_width(buf_siz)
 
         # Fetch another image if we've scrolled a full width
         if self.n > self.eval_width * self.scale:
@@ -143,7 +148,9 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
     def get_next_image(self, buf_siz):
         #print("[D] Update pre q get")
         if len(self.img_q) > 0:
-            self.pimg = self.img_q.popleft()
+            img = self.img_q.popleft()
+            self.pimg = ImageTk.PhotoImage(img.resize((int(img.width * self.scale), int(img.height * self.scale))))
+
             #print("[D] Update post q get")
             self.prefetch_count -= 1
             self.prediction_count += 1
