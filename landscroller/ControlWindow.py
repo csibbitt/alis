@@ -2,6 +2,7 @@ from os.path import basename
 from PIL import Image, ImageTk
 import tkinter as tk
 import tkinter.filedialog as filedialog
+from .SamplesWindow import SamplesWindow
 
 def process_input_image(file_path):
     img = Image.open(file_path)
@@ -57,8 +58,8 @@ class ControlWindow():
 
         pause_button = tk.Button(self.app, text="Pause/Play Updates", command=self.pause_play_updates)
         pause_button.grid(row=0, column=2)
-        open_file_button = tk.Button(self.app, text="Open File", command=self.open_file)
-        open_file_button.grid(row=1, column=2)
+        open_samples_button = tk.Button(self.app, text="Open Samples", command=self.open_samples)
+        open_samples_button.grid(row=1, column=2)
         save_buffer_button = tk.Button(self.app, text="Shuffle", command=self.display_window.shuffle)
         save_buffer_button.grid(row=2, column=2)
 
@@ -67,22 +68,8 @@ class ControlWindow():
         status_label = tk.Label(status_frame, textvariable=self.app.status)
         status_label.grid()
 
-    def open_file(self):
-        label = self.seed_preview_label
-        file_types = [("Image Files", "*.bmp *.png *.jpg *.jpeg *.gif *.tif *.tiff"),("All Files", "*"),]
-        file_path = filedialog.askopenfilename(filetypes=file_types)
-        if file_path:
-            img, img_hash = process_input_image(file_path)
-            in_im = self.app.input_images
-            if (len(in_im) == 0):
-                    in_im.append(img)
-            else:
-                in_im[0] = img
-            self.app.input_hash.set('f_' + img_hash)
-            label.image = ImageTk.PhotoImage(img.resize((32,32)))
-            label.config(image=label.image)
-            self.app.status.set(f'Loaded {basename(file_path)} ({self.app.input_hash})')
-            self.display_window.shuffle()
+    def open_samples(self):
+        SamplesWindow(self.app)
 
     def pause_play_updates(self):
         self.app.paused.set(not self.app.paused.get())

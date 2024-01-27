@@ -2,9 +2,7 @@ import random
 from glob import glob
 import numpy as np
 from PIL import Image
-from hashlib import md5
 import os
-import pickle
 
 import dnnlib
 from scripts.legacy import load_network_pkl
@@ -18,13 +16,10 @@ from training.networks import PatchWiseSynthesisLayer
 os.environ['CC'] = 'gcc-10'
 os.environ['CXX'] = 'g++-10'
 
-def input_hasher(data):
-  return md5(pickle.dumps(data)).hexdigest()[:7]
-
 device = 'cuda'
 G = None
 
-def buildModel():
+def build_model():
   global G
 
   torch.set_grad_enabled(False)
@@ -44,10 +39,36 @@ def buildModel():
         block.conv0.use_noise = False
     block.conv1.use_noise = False
 
+def get_batch_from_ws(ws, modes_idx, img_callback=None):
+    batch_size = ws.shape[0]
+    ws_context = torch.stack([
+        G.mapping(torch.randn((batch_size, ws.shape[2])).to(device), c=None, skip_w_avg_update=True, modes_idx=modes_idx[0]),
+        G.mapping(torch.randn((batch_size, ws.shape[2])).to(device), c=None, skip_w_avg_update=True, modes_idx=modes_idx[1]),
+    ], dim=1)
 
-def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash, mix_strength):
+    preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long() - 2, noise='const')
 
-  buildModel()
+    imgs = []
+    for img in preds:
+      imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
+
+    retval = zip(imgs, ws)
+
+    if img_callback is not None:
+      return img_callback(retval)
+    return retval
+
+
+def get_rand_batch(batch_size = 4, img_callback=None):
+    mode_idx = 0  #** What is this about?
+    modes_idx = (torch.ones(1, device=device).repeat(batch_size+1).float() * mode_idx).long()
+    z = torch.randn(batch_size, G.z_dim).to(device)
+    ws = G.mapping(z, c=None, modes_idx=modes_idx[0]) #.mean(dim=0, keepdim=True)
+    return get_batch_from_ws(ws, modes_idx, img_callback)
+
+build_model()
+
+def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_strength):
 
   while True:
     if len(input_images) == 0:
@@ -61,7 +82,6 @@ def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash
       mode_idx = 0  #** What is this about?
       modes_idx = (torch.ones(1, device=zs.device).repeat(num_ws).float() * mode_idx).long()
       ws = G.mapping(zs, c=None, modes_idx=modes_idx)  # [num_ws, 19, 512]
-      seed_hash.set('t_' + input_hasher(ws))
 
       # Truncating
       z_mean = torch.randn(1000, G.z_dim).to(device)
@@ -105,14 +125,13 @@ def mainSession(buffer_size, img_callback, shuffle_flag, input_images, seed_hash
       shift += 2
     shuffle_flag.set(False)
 
-def mainSessionMock(buffer_size, img_callback, shuffle_flag, input_images, seed_hash, mix_strength):
+def main_session_mock(buffer_size, img_callback, shuffle_flag, input_images, mix_strength):
     eval_width = 1024
     eval_height = 1024
     file_list = glob('mock_images/endless*.jpg')
     while True:
         random.shuffle(file_list)
         mockImage = Image.open(file_list[0])
-        seed_hash.set('m_' + input_hasher(mockImage))
 
         prediction_count = 0
         first = True
