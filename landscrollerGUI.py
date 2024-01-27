@@ -2,7 +2,7 @@
 import argparse
 import threading
 #import run_model as Eval
-from landscroller import App, ControlWindow, DisplayWindow, SamplesWindow
+from landscroller import App, SamplesWindow #, ControlWindow, DisplayWindow
 
 import os
 os.environ['XLA_FLAGS'] = "--xla_gpu_cuda_data_dir=/usr/lib/cuda"

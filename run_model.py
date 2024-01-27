@@ -39,31 +39,84 @@ def build_model():
         block.conv0.use_noise = False
     block.conv1.use_noise = False
 
-def get_batch_from_ws(ws, modes_idx, img_callback=None):
-    batch_size = ws.shape[0]
-    ws_context = torch.stack([
-        G.mapping(torch.randn((batch_size, ws.shape[2])).to(device), c=None, skip_w_avg_update=True, modes_idx=modes_idx[0]),
-        G.mapping(torch.randn((batch_size, ws.shape[2])).to(device), c=None, skip_w_avg_update=True, modes_idx=modes_idx[1]),
-    ], dim=1)
 
-    preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long() - 2, noise='const')
+def generate_neighbor_ws(num, ws, dist=0.6):
+  ws_list = []
+
+  if num == 25:  # Spatial layout for grid
+    ws_matrix = [[None] * 5 for _ in range(5)]
+    ws_matrix[2][2] = ws
+    east_west = torch.randn(ws.shape).to(device)
+    ws_matrix[2][1] = (1 - dist/2) * ws + dist/2 * east_west
+    ws_matrix[2][0] = (1 - dist) * ws + dist * east_west
+    ws_matrix[2][3] = (1 - dist/2) * ws + dist/2 * -east_west
+    ws_matrix[2][4] = (1 - dist) * ws + dist * -east_west
+    north_south = torch.randn(ws.shape).to(device)
+    ws_matrix[0][2] = (1 - dist/2) * ws + dist/2 * north_south
+    ws_matrix[1][2] = (1 - dist) * ws + dist * north_south
+    ws_matrix[3][2] = (1 - dist/2) * ws + dist/2 * -north_south
+    ws_matrix[4][2] = (1 - dist) * ws + dist * -north_south
+    north_east = (east_west + north_south) * 0.5
+    ws_matrix[1][3] = (1 - dist/2) * ws + dist/2 * north_east
+    ws_matrix[0][4] = (1 - dist) * ws + dist * north_east
+    ws_matrix[3][1] = (1 - dist/2) * ws + dist/2 * -north_east
+    ws_matrix[4][0] = (1 - dist) * ws + dist * -north_east
+    south_east = (east_west - north_south) * 0.5
+    ws_matrix[3][3] = (1 - dist/2) * ws + dist/2 * south_east
+    ws_matrix[4][4] = (1 - dist) * ws + dist * south_east
+    ws_matrix[1][1] = (1 - dist/2) * ws + dist/2 * -south_east
+    ws_matrix[0][0] = (1 - dist) * ws + dist * -south_east
+
+    ws_matrix[0][1] = (ws_matrix[0][0] + ws_matrix[0][2]) * 0.5
+    ws_matrix[0][3] = (ws_matrix[0][2] + ws_matrix[0][4]) * 0.5
+
+    ws_matrix[1][0] = (ws_matrix[0][0] + ws_matrix[2][0]) * 0.5
+    ws_matrix[1][4] = (ws_matrix[0][4] + ws_matrix[2][4]) * 0.5
+
+    ws_matrix[3][0] = (ws_matrix[2][0] + ws_matrix[4][0]) * 0.5
+    ws_matrix[3][4] = (ws_matrix[2][4] + ws_matrix[4][4]) * 0.5
+
+    ws_matrix[4][1] = (ws_matrix[4][0] + ws_matrix[4][2]) * 0.5
+    ws_matrix[4][3] = (ws_matrix[4][2] + ws_matrix[4][4]) * 0.5
+
+    for i in range(5):
+       for j in range(5):
+          ws_list.append(ws_matrix[i][j])
+  else:
+    for _ in range(num):
+      ws_list.append((1 - dist) * ws + dist * torch.randn(ws.shape).to(device))
+  return torch.stack(ws_list)
+
+def get_modes_idx(size):  #** What is this about?
+    mode_idx = 0
+    return (torch.ones(1, device=device).repeat(size+1).float() * mode_idx).long()
+
+def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=None):
+
+    if batch_size is None:
+      batch_size = all_ws.shape[0]
 
     imgs = []
-    for img in preds:
-      imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
+    for ws in torch.split(all_ws, batch_size):
+      if modes_idx is None:
+        modes_idx = get_modes_idx(batch_size)
 
-    retval = zip(imgs, ws)
+      ws_context = torch.stack([ ws, ws, ], dim=1)
+
+      preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long(), noise='const')
+      for img in preds:
+        imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
+
+    retval = zip(imgs, all_ws)
 
     if img_callback is not None:
       return img_callback(retval)
     return retval
 
-
 def get_rand_batch(batch_size = 4, img_callback=None):
-    mode_idx = 0  #** What is this about?
-    modes_idx = (torch.ones(1, device=device).repeat(batch_size+1).float() * mode_idx).long()
+    modes_idx = get_modes_idx(batch_size)
     z = torch.randn(batch_size, G.z_dim).to(device)
-    ws = G.mapping(z, c=None, modes_idx=modes_idx[0]) #.mean(dim=0, keepdim=True)
+    ws = G.mapping(z, c=None, modes_idx=modes_idx[0])
     return get_batch_from_ws(ws, modes_idx, img_callback)
 
 build_model()
