@@ -133,6 +133,7 @@ class StyleGAN2Loss(Loss):
             with torch.autograd.profiler.record_function('Gpl_backward'):
                 (gen_img[:, 0, 0, 0] * 0 + loss_Gpl).mean().mul(gain).backward()
 
+        #***** Looks like dead code
         if do_Gae:
             with torch.autograd.profiler.record_function('Gae_forward'):
                 structure, style = self.run_encoder(real_img, real_c, sync)
