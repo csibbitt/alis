@@ -70,26 +70,26 @@ class SamplesWindow(tk.Toplevel):
 
   def variations(self, i, j):
       label = self.sample_labels[i][j]
-      SamplesWindow(self, label.ws)
+      SamplesWindow(self.app, label.ws)
 
   def resample(self, i, j):
     if self.ws is not None:
       neighbor_ws = generate_neighbor_ws(1, self.ws)
-      img, ws = next(get_batch_from_ws(neighbor_ws))
+      img, ws, dist = next(get_batch_from_ws(neighbor_ws))
     else:
-      img, ws = next(get_rand_batch(1))
-    self.update_sample(i, j, img, ws)
+      img, ws, dist = next(get_rand_batch(1))
+    self.update_sample(i, j, img, ws, dist)
 
-  def update_sample(self, i, j, img, ws):
+  def update_sample(self, i, j, img, ws, dist):
     label = self.sample_labels[i][j]
     label.pimg = ImageTk.PhotoImage(img.resize((self.sample_res, self.sample_res)))
     label.ws = ws
-    label.status.set(input_hasher(ws))
+    label.status.set(f"{input_hasher(ws)} d({dist})")
     label.config(image=label.pimg)
 
   def populate_callback(self, img_tuples):
-    for img, ws in img_tuples:
-      self.update_sample(self.populate_grid_i, self.populate_grid_j, img, ws)
+    for img, ws, dist in img_tuples:
+      self.update_sample(self.populate_grid_i, self.populate_grid_j, img, ws, dist)
       self.populate_grid_j += 1
       if self.populate_grid_j >= self.grid_size_j:
           self.populate_grid_j = 0

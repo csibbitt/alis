@@ -18,9 +18,10 @@ os.environ['CXX'] = 'g++-10'
 
 device = 'cuda'
 G = None
+ws_mean = None
 
 def build_model():
-  global G
+  global G, ws_mean
 
   torch.set_grad_enabled(False)
 
@@ -39,33 +40,38 @@ def build_model():
         block.conv0.use_noise = False
     block.conv1.use_noise = False
 
+    z_mean = torch.randn(1000, G.z_dim).to(device)
+    ws_mean = G.mapping(z_mean, c=None, modes_idx=get_modes_idx(1000)[0]).mean(dim=0, keepdim=True)
 
-def generate_neighbor_ws(num, ws, dist=0.6):
+
+def generate_neighbor_ws(num, ws, dist=0.8):
+  global ws_mean
+
   ws_list = []
 
   if num == 25:  # Spatial layout for grid
     ws_matrix = [[None] * 5 for _ in range(5)]
     ws_matrix[2][2] = ws
     east_west = torch.randn(ws.shape).to(device)
-    ws_matrix[2][1] = (1 - dist/2) * ws + dist/2 * east_west
-    ws_matrix[2][0] = (1 - dist) * ws + dist * east_west
-    ws_matrix[2][3] = (1 - dist/2) * ws + dist/2 * -east_west
-    ws_matrix[2][4] = (1 - dist) * ws + dist * -east_west
+    ws_matrix[2][1] = ws + dist/2 * east_west
+    ws_matrix[2][0] = ws + dist * east_west
+    ws_matrix[2][3] = ws + dist/2 * -east_west
+    ws_matrix[2][4] = ws + dist * -east_west
     north_south = torch.randn(ws.shape).to(device)
-    ws_matrix[0][2] = (1 - dist/2) * ws + dist/2 * north_south
-    ws_matrix[1][2] = (1 - dist) * ws + dist * north_south
-    ws_matrix[3][2] = (1 - dist/2) * ws + dist/2 * -north_south
-    ws_matrix[4][2] = (1 - dist) * ws + dist * -north_south
+    ws_matrix[0][2] = ws + dist/2 * north_south
+    ws_matrix[1][2] = ws + dist * north_south
+    ws_matrix[3][2] = ws + dist/2 * -north_south
+    ws_matrix[4][2] = ws + dist * -north_south
     north_east = (east_west + north_south) * 0.5
-    ws_matrix[1][3] = (1 - dist/2) * ws + dist/2 * north_east
-    ws_matrix[0][4] = (1 - dist) * ws + dist * north_east
-    ws_matrix[3][1] = (1 - dist/2) * ws + dist/2 * -north_east
-    ws_matrix[4][0] = (1 - dist) * ws + dist * -north_east
+    ws_matrix[1][3] = ws + dist/2 * north_east
+    ws_matrix[0][4] = ws + dist * north_east
+    ws_matrix[3][1] = ws + dist/2 * -north_east
+    ws_matrix[4][0] = ws + dist * -north_east
     south_east = (east_west - north_south) * 0.5
-    ws_matrix[3][3] = (1 - dist/2) * ws + dist/2 * south_east
-    ws_matrix[4][4] = (1 - dist) * ws + dist * south_east
-    ws_matrix[1][1] = (1 - dist/2) * ws + dist/2 * -south_east
-    ws_matrix[0][0] = (1 - dist) * ws + dist * -south_east
+    ws_matrix[3][3] = ws + dist/2 * south_east
+    ws_matrix[4][4] = ws + dist * south_east
+    ws_matrix[1][1] = ws + dist/2 * -south_east
+    ws_matrix[0][0] = ws + dist * -south_east
 
     ws_matrix[0][1] = (ws_matrix[0][0] + ws_matrix[0][2]) * 0.5
     ws_matrix[0][3] = (ws_matrix[0][2] + ws_matrix[0][4]) * 0.5
@@ -84,8 +90,12 @@ def generate_neighbor_ws(num, ws, dist=0.6):
           ws_list.append(ws_matrix[i][j])
   else:
     for _ in range(num):
-      ws_list.append((1 - dist) * ws + dist * torch.randn(ws.shape).to(device))
-  return torch.stack(ws_list)
+      ws_list.append(ws + dist * torch.randn(ws.shape).to(device))
+
+  out_ws = torch.stack(ws_list)
+  truncation_factor = 0.9
+  out_ws = out_ws * truncation_factor + (1 - truncation_factor) * ws_mean
+  return out_ws
 
 def get_modes_idx(size):  #** What is this about?
     mode_idx = 0
@@ -97,9 +107,12 @@ def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=No
       batch_size = all_ws.shape[0]
 
     imgs = []
+    dists = []
     for ws in torch.split(all_ws, batch_size):
       if modes_idx is None:
         modes_idx = get_modes_idx(batch_size)
+
+      dists.append(torch.nn.PairwiseDistance()(ws[0][0], ws_mean[0][0]).item())
 
       ws_context = torch.stack([ ws, ws, ], dim=1)
 
@@ -107,7 +120,7 @@ def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=No
       for img in preds:
         imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
 
-    retval = zip(imgs, all_ws)
+    retval = zip(imgs, all_ws, dists)
 
     if img_callback is not None:
       return img_callback(retval)
@@ -117,6 +130,8 @@ def get_rand_batch(batch_size = 4, img_callback=None):
     modes_idx = get_modes_idx(batch_size)
     z = torch.randn(batch_size, G.z_dim).to(device)
     ws = G.mapping(z, c=None, modes_idx=modes_idx[0])
+    truncation_factor = 0.8
+    ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
     return get_batch_from_ws(ws, modes_idx, img_callback)
 
 build_model()
@@ -138,9 +153,9 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_stre
 
       # Truncating
       z_mean = torch.randn(1000, G.z_dim).to(device)
-      ws_proto = G.mapping(z_mean, c=None, modes_idx=modes_idx[0]).mean(dim=0, keepdim=True)
+      ws_mean = G.mapping(z_mean, c=None, modes_idx=modes_idx[0]).mean(dim=0, keepdim=True)
       truncation_factor = 1 - (mix_strength.get() / 100)
-      ws = ws * truncation_factor + (1 - truncation_factor) * ws_proto
+      ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
 
     else:
       #** Project input_images to Wl, Wc, Wr
@@ -159,7 +174,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_stre
       if shift % w_range == 0:
         new_z =  torch.randn(2, G.z_dim).to(device)
         new_ws = G.mapping(new_z, c=None, modes_idx=torch.zeros(1).long().to(device))
-        new_ws = new_ws * truncation_factor + (1 - truncation_factor) * ws_proto
+        new_ws = new_ws * truncation_factor + (1 - truncation_factor) * ws_mean
         ws = torch.cat((ws[1:], new_ws))
         curr_w_idx += 1
         curr_ws = ws[curr_w_idx].unsqueeze(0)
