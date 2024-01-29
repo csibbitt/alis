@@ -30,8 +30,13 @@ class SamplesWindow(tk.Toplevel):
 
     self.batch_size = 5
 
+    self.top_frame = tk.Frame(self)
+    self.top_frame.grid(column=0, row=0, sticky=('n', 's', 'e', 'w'))
+    button = tk.Button(self.top_frame, text="Resample All", command=self.populate_samples)
+    button.grid(row=0, column=0)
+
     self.main_frame = tk.Frame(self)
-    self.main_frame.grid(column=0, row=0, sticky=('n', 's', 'e', 'w'))
+    self.main_frame.grid(column=0, row=1, sticky=('n', 's', 'e', 'w'))
 
     self.sample_labels = []
 
@@ -58,11 +63,20 @@ class SamplesWindow(tk.Toplevel):
         status_label = tk.Label(sample_frame, textvariable=label.status)
         status_label.grid()
 
-    if ws is None:
+    self.populate_samples()
+
+
+  def populate_samples(self):
+    self.populate_grid_i = 0
+    self.populate_grid_j = 0
+    for i in range(self.grid_size_i):
+      for j in range(self.grid_size_j):
+        self.sample_labels[i][j].status.set("...waiting...")
+    if self.ws is None:
       self.target = get_rand_batch
       self.target_args = (self.batch_size, self.populate_callback)
     else:
-      neighbor_ws = generate_neighbor_ws(self.grid_total, ws)
+      neighbor_ws = generate_neighbor_ws(self.grid_total, self.ws)
       self.target = get_batch_from_ws
       self.target_args = (neighbor_ws, None, self.populate_callback, self.batch_size)
 
@@ -84,7 +98,7 @@ class SamplesWindow(tk.Toplevel):
     label = self.sample_labels[i][j]
     label.pimg = ImageTk.PhotoImage(img.resize((self.sample_res, self.sample_res)))
     label.ws = ws
-    label.status.set(f"{input_hasher(ws)} d({dist})")
+    label.status.set(f"{input_hasher(ws)} d({dist:.2f})")
     label.config(image=label.pimg)
 
   def populate_callback(self, img_tuples):

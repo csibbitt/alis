@@ -19,6 +19,8 @@ os.environ['CXX'] = 'g++-10'
 device = 'cuda'
 G = None
 ws_mean = None
+truncation_factor = 0.7
+
 
 def build_model():
   global G, ws_mean
@@ -40,8 +42,8 @@ def build_model():
         block.conv0.use_noise = False
     block.conv1.use_noise = False
 
-    z_mean = torch.randn(1000, G.z_dim).to(device)
-    ws_mean = G.mapping(z_mean, c=None, modes_idx=get_modes_idx(1000)[0]).mean(dim=0, keepdim=True)
+  z_mean = torch.randn(1000, G.z_dim).to(device)
+  ws_mean = G.mapping(z_mean, c=None, modes_idx=get_modes_idx(1000)[0]).mean(dim=0, keepdim=True)
 
 
 def generate_neighbor_ws(num, ws, dist=0.8):
@@ -93,8 +95,11 @@ def generate_neighbor_ws(num, ws, dist=0.8):
       ws_list.append(ws + dist * torch.randn(ws.shape).to(device))
 
   out_ws = torch.stack(ws_list)
-  truncation_factor = 0.9
   out_ws = out_ws * truncation_factor + (1 - truncation_factor) * ws_mean
+
+  if num == 25:
+    out_ws[12] = ws
+
   return out_ws
 
 def get_modes_idx(size):  #** What is this about?
@@ -112,7 +117,8 @@ def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=No
       if modes_idx is None:
         modes_idx = get_modes_idx(batch_size)
 
-      dists.append(torch.nn.PairwiseDistance()(ws[0][0], ws_mean[0][0]).item())
+      for w in ws:
+        dists.append(torch.nn.PairwiseDistance()(w[0], ws_mean[0][0]).item())
 
       ws_context = torch.stack([ ws, ws, ], dim=1)
 
@@ -130,13 +136,12 @@ def get_rand_batch(batch_size = 4, img_callback=None):
     modes_idx = get_modes_idx(batch_size)
     z = torch.randn(batch_size, G.z_dim).to(device)
     ws = G.mapping(z, c=None, modes_idx=modes_idx[0])
-    truncation_factor = 0.8
     ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
     return get_batch_from_ws(ws, modes_idx, img_callback)
 
 build_model()
 
-def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_strength):
+def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_factor):
 
   while True:
     if len(input_images) == 0:
@@ -152,9 +157,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_stre
       ws = G.mapping(zs, c=None, modes_idx=modes_idx)  # [num_ws, 19, 512]
 
       # Truncating
-      z_mean = torch.randn(1000, G.z_dim).to(device)
-      ws_mean = G.mapping(z_mean, c=None, modes_idx=modes_idx[0]).mean(dim=0, keepdim=True)
-      truncation_factor = 1 - (mix_strength.get() / 100)
+      truncation_factor = 1 - (trunc_factor.get() / 100)
       ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
 
     else:
@@ -168,8 +171,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_stre
     curr_ws = ws[curr_w_idx].unsqueeze(0)
     curr_ws_context = torch.stack([ws[curr_w_idx - 1].unsqueeze(0), ws[curr_w_idx + 1].unsqueeze(0)], dim=1)
     while not shuffle_flag.get():
-
-      truncation_factor = 1 - (mix_strength.get() / 100)
+      truncation_factor = 1 - (trunc_factor.get() / 100)
 
       if shift % w_range == 0:
         new_z =  torch.randn(2, G.z_dim).to(device)
@@ -193,7 +195,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, mix_stre
       shift += 2
     shuffle_flag.set(False)
 
-def main_session_mock(buffer_size, img_callback, shuffle_flag, input_images, mix_strength):
+def main_session_mock(buffer_size, img_callback, shuffle_flag, input_images, trunc_factor):
     eval_width = 1024
     eval_height = 1024
     file_list = glob('mock_images/endless*.jpg')

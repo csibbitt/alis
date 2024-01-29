@@ -15,7 +15,7 @@ class App(tk.Tk):
         self.fps = tk.IntVar(value=24)
         self.input_hash = tk.StringVar(value='0s')
         self.input_images = []
-        self.mix_strength = tk.IntVar(value=10)
+        self.trunc_factor = tk.IntVar(value=5)
         self.paused = tk.BooleanVar(value=False)
         self.predictions_string = tk.StringVar(value='0-0')
         self.running_time_str = tk.StringVar(value='0s')
