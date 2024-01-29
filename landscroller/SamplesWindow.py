@@ -78,7 +78,7 @@ class SamplesWindow(tk.Toplevel):
     else:
       neighbor_ws = generate_neighbor_ws(self.grid_total, self.ws)
       self.target = get_batch_from_ws
-      self.target_args = (neighbor_ws, None, self.populate_callback, self.batch_size)
+      self.target_args = (neighbor_ws, self.populate_callback, self.batch_size)
 
     threading.Thread(name='populate_eval', target=self.target, args=self.target_args).start()
 

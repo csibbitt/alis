@@ -43,7 +43,7 @@ def build_model():
     block.conv1.use_noise = False
 
   z_mean = torch.randn(1000, G.z_dim).to(device)
-  ws_mean = G.mapping(z_mean, c=None, modes_idx=get_modes_idx(1000)[0]).mean(dim=0, keepdim=True)
+  ws_mean = G.mapping(z_mean, c=None, modes_idx=torch.zeros(1000).long().to(device)).mean(dim=0, keepdim=True)
 
 
 def generate_neighbor_ws(num, ws, dist=0.8):
@@ -102,11 +102,7 @@ def generate_neighbor_ws(num, ws, dist=0.8):
 
   return out_ws
 
-def get_modes_idx(size):  #** What is this about?
-    mode_idx = 0
-    return (torch.ones(1, device=device).repeat(size+1).float() * mode_idx).long()
-
-def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=None):
+def get_batch_from_ws(all_ws, img_callback=None, batch_size=None):
 
     if batch_size is None:
       batch_size = all_ws.shape[0]
@@ -114,15 +110,12 @@ def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=No
     imgs = []
     dists = []
     for ws in torch.split(all_ws, batch_size):
-      if modes_idx is None:
-        modes_idx = get_modes_idx(batch_size)
-
       for w in ws:
         dists.append(torch.nn.PairwiseDistance()(w[0], ws_mean[0][0]).item())
 
-      ws_context = torch.stack([ ws, ws, ], dim=1)
+      ws_context = torch.stack([ws, ws,], dim=1)
 
-      preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long(), noise='const')
+      preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long() + 3, noise='const')
       for img in preds:
         imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
 
@@ -133,11 +126,10 @@ def get_batch_from_ws(all_ws, modes_idx = None, img_callback=None, batch_size=No
     return retval
 
 def get_rand_batch(batch_size = 4, img_callback=None):
-    modes_idx = get_modes_idx(batch_size)
     z = torch.randn(batch_size, G.z_dim).to(device)
-    ws = G.mapping(z, c=None, modes_idx=modes_idx[0])
+    ws = G.mapping(z, c=None, modes_idx=torch.zeros(batch_size).long().to(device))
     ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
-    return get_batch_from_ws(ws, modes_idx, img_callback)
+    return get_batch_from_ws(ws, img_callback)
 
 build_model()
 
@@ -152,9 +144,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
       num_ws = num_frames // num_frames_per_w + 1
       w_range = 2 * num_frames_per_w * G.synthesis_cfg.patchwise.grid_size
       zs = torch.randn(num_ws, G.z_dim).to(device)  # [3, 512]
-      mode_idx = 0  #** What is this about?
-      modes_idx = (torch.ones(1, device=zs.device).repeat(num_ws).float() * mode_idx).long()
-      ws = G.mapping(zs, c=None, modes_idx=modes_idx)  # [num_ws, 19, 512]
+      ws = G.mapping(zs, c=None, modes_idx=torch.zeros(1).long().to(device))  # [num_ws, 19, 512]
 
       # Truncating
       truncation_factor = 1 - (trunc_factor.get() / 100)
