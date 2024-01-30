@@ -6,8 +6,12 @@ import tkinter as tk
 
 from run_model import get_rand_batch, get_batch_from_ws, generate_neighbor_ws
 
-def input_hasher(data):
-  return md5(pickle.dumps(data.cpu().numpy())).hexdigest()[:7]
+def input_hasher(data = None, pdata = None):
+  if pdata is not None:
+    return(md5(pdata)).hexdigest()[:7]
+  elif data is not None:
+    return md5(pickle.dumps(data.cpu().numpy())).hexdigest()[:7]
+
 
 class SamplesWindow(tk.Toplevel):
   def __init__(self, container, ws=None):
@@ -35,15 +39,15 @@ class SamplesWindow(tk.Toplevel):
     button = tk.Button(self.top_frame, text="Resample All", command=self.populate_samples)
     button.grid(row=0, column=0)
 
-    self.main_frame = tk.Frame(self)
-    self.main_frame.grid(column=0, row=1, sticky=('n', 's', 'e', 'w'))
+    main_frame = tk.Frame(self)
+    main_frame.grid(column=0, row=1, sticky=('n', 's', 'e', 'w'))
 
     self.sample_labels = []
 
     for i in range(self.grid_size_i):
       self.sample_labels.append([])
       for j in range(self.grid_size_j):
-        sample_frame = tk.Frame(self.main_frame, highlightbackground="black", highlightthickness=1)
+        sample_frame = tk.Frame(main_frame, highlightbackground="black", highlightthickness=1)
         sample_frame.grid(row=i, column=j)
 
         pimg = ImageTk.PhotoImage(Image.open("startup.jpg").resize((self.sample_res,self.sample_res)))
@@ -53,7 +57,7 @@ class SamplesWindow(tk.Toplevel):
         label.grid(row=0, column=0, rowspan=3)
         label.status = tk.StringVar(value="...waiting...")
 
-        button = tk.Button(sample_frame, text="+")
+        button = tk.Button(sample_frame, text="+", command=lambda i=i, j=j: self.bookmark(i, j))
         button.grid(row=0, column=1)
         button = tk.Button(sample_frame, text="r", command=lambda i=i, j=j: self.resample(i, j))
         button.grid(row=1, column=1)
@@ -82,9 +86,17 @@ class SamplesWindow(tk.Toplevel):
 
     threading.Thread(name='populate_eval', target=self.target, args=self.target_args).start()
 
+  def bookmark(self, i, j):
+    import torch
+    label = self.sample_labels[i][j]
+    pickled_ws = pickle.dumps(label.ws.cpu().numpy())
+    hash = input_hasher(pdata=pickled_ws)
+    torch.save(label.ws, f'outputs/{hash}')
+    self.app.control_window.add_bookmark(label.pimg, hash, )
+
   def variations(self, i, j):
-      label = self.sample_labels[i][j]
-      SamplesWindow(self.app, label.ws)
+    label = self.sample_labels[i][j]
+    SamplesWindow(self.app, label.ws)
 
   def resample(self, i, j):
     if self.ws is not None:
