@@ -43,10 +43,6 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.start()
 
     def eval_callback(self, img):
-        if self.prediction_count == 0:
-            label = self.app.control_window.seed_preview_label
-            label.image = ImageTk.PhotoImage(img.crop((0,0,1024,1024)).resize((32,32)))
-            label.config(image=label.image)
 
         while len(self.img_q) >= self.img_q.maxlen:
             time.sleep(0.25)

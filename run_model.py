@@ -33,8 +33,9 @@ def build_model():
 
   with dnnlib.util.open_url(network_pkl) as f:
     G = load_network_pkl(f)['G_ema'].to(device) # type: ignore
-    G.eval()
-    G.progressive_growing_update(100000)  #** Thought this was disabled?
+
+  G.eval()
+  G.progressive_growing_update(100000)  #** Thought this was disabled?
 
   for res in G.synthesis.block_resolutions:
     block = getattr(G.synthesis, f'b{res}')
@@ -163,7 +164,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
     while not shuffle_flag.get():
       truncation_factor = 1 - (trunc_factor.get() / 100)
 
-      if shift % w_range == 0:
+      if shift % w_range == 0 and shift > 0:
         new_z =  torch.randn(2, G.z_dim).to(device)
         new_ws = G.mapping(new_z, c=None, modes_idx=torch.zeros(1).long().to(device))
         new_ws = new_ws * truncation_factor + (1 - truncation_factor) * ws_mean
@@ -172,7 +173,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
         curr_ws = ws[curr_w_idx].unsqueeze(0)
         curr_ws_context = torch.stack([ws[curr_w_idx - 1].unsqueeze(0), ws[curr_w_idx + 1].unsqueeze(0)], dim=1)
 
-      curr_left_borders_idx = torch.zeros(1, device=zs.device).long() + (shift % w_range)  #** What does this do?
+      curr_left_borders_idx = torch.zeros(1, device=zs.device).long() + (shift % w_range)  # [0-6] offset in the 3-ws grid, 3 is center image only
 
       img = G.synthesis(curr_ws, ws_context=curr_ws_context, left_borders_idx=curr_left_borders_idx, noise='const')
 

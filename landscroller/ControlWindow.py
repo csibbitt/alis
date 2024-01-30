@@ -36,10 +36,6 @@ class ControlWindow():
         mix_and_preview_frame.grid(row=1, column=1, sticky="w")
         trunc_factor_spinbox = tk.Spinbox(mix_and_preview_frame, from_=0, to=100, width=5, textvariable=self.app.trunc_factor, validate="key", validatecommand=(tk_vsi, '%P'))
         trunc_factor_spinbox.grid(row=0, column=0, sticky="w")
-        seed_preview_frame = tk.Frame(mix_and_preview_frame, highlightbackground="black", highlightthickness=1, border=1)
-        seed_preview_frame.grid(row=0, column=1)
-        self.seed_preview_label = tk.Label(seed_preview_frame, image=ImageTk.PhotoImage(Image.new(mode='RGB', size=(32,32))))
-        self.seed_preview_label.grid(row=0, column=0)
 
         fps_frame = tk.Frame(self.app)
         fps_frame.grid(row=2, column=1, columnspan=2, sticky="w")
