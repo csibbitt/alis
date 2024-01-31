@@ -89,10 +89,11 @@ class SamplesWindow(tk.Toplevel):
   def bookmark(self, i, j):
     import torch
     label = self.sample_labels[i][j]
-    pickled_ws = pickle.dumps(label.ws.cpu().numpy())
+    ws = label.ws.cpu()
+    pickled_ws = pickle.dumps(ws)
     hash = input_hasher(pdata=pickled_ws)
     torch.save(label.ws, f'outputs/{hash}')
-    self.app.control_window.add_bookmark(label.pimg, hash, )
+    self.app.control_window.add_bookmark(label.pimg, hash, ws)
 
   def variations(self, i, j):
     label = self.sample_labels[i][j]

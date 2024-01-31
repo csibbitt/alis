@@ -20,6 +20,8 @@ class App(tk.Tk):
         self.predictions_string = tk.StringVar(value='0-0')
         self.running_time_str = tk.StringVar(value='0s')
 
+        self.mix_ws = []
+
         self.status = tk.StringVar(value='Starting up...')
         self.shuffle_flag = tk.BooleanVar(value=False)
 

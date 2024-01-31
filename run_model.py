@@ -104,27 +104,26 @@ def generate_neighbor_ws(num, ws, dist=0.8):
   return out_ws
 
 def get_batch_from_ws(all_ws, img_callback=None, batch_size=None):
+  if batch_size is None:
+    batch_size = all_ws.shape[0]
 
-    if batch_size is None:
-      batch_size = all_ws.shape[0]
+  imgs = []
+  dists = []
+  for ws in torch.split(all_ws, batch_size):
+    for w in ws:
+      dists.append(torch.nn.PairwiseDistance()(w[0], ws_mean[0][0]).item())
 
-    imgs = []
-    dists = []
-    for ws in torch.split(all_ws, batch_size):
-      for w in ws:
-        dists.append(torch.nn.PairwiseDistance()(w[0], ws_mean[0][0]).item())
+    ws_context = torch.stack([ws, ws,], dim=1)
 
-      ws_context = torch.stack([ws, ws,], dim=1)
+    preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long() + 3, noise='const')
+    for img in preds:
+      imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
 
-      preds = G.synthesis(ws, ws_context=ws_context, left_borders_idx=torch.zeros(batch_size, device=device).long() + 3, noise='const')
-      for img in preds:
-        imgs.append(TVF.to_pil_image(img.cpu().clamp(-1, 1) * 0.5 + 0.5))
+  retval = zip(imgs, all_ws, dists)
 
-    retval = zip(imgs, all_ws, dists)
-
-    if img_callback is not None:
-      return img_callback(retval)
-    return retval
+  if img_callback is not None:
+    return img_callback(retval)
+  return retval
 
 def get_rand_batch(batch_size = 4, img_callback=None):
     z = torch.randn(batch_size, G.z_dim).to(device)
@@ -134,8 +133,25 @@ def get_rand_batch(batch_size = 4, img_callback=None):
 
 build_model()
 
-def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_factor):
+def interpolate_mix_ws(ow, mix_ws):
+  if(len(mix_ws) == 0):
+    return ow
 
+  strengths = torch.tensor([tup[0].get() for tup in mix_ws], dtype=torch.float32)
+  tensors = torch.stack([tup[1] for tup in mix_ws])
+
+  tensors = tensors[ strengths[:] > 0 ] # where mix strength is > 0
+  if len(tensors) == 0:
+     return ow
+  strengths = strengths[ strengths[:] > 0 ]
+  strengths[:] /= 100 # initial scaling of the strength values from a % to a decimal
+
+  scale = max(1, sum(strengths)) # to account for sums > 100
+  diminished_ow = (1 - sum(strengths) / scale) * ow
+  mix_component = sum(strengths.view(-1,1,1) * tensors / scale)
+  return diminished_ow.to(device) + mix_component.to(device)
+
+def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_factor, mix_ws):
   while True:
     if len(input_images) == 0:
 
@@ -146,7 +162,6 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
       w_range = 2 * num_frames_per_w * G.synthesis_cfg.patchwise.grid_size
       zs = torch.randn(num_ws, G.z_dim).to(device)  # [3, 512]
       ws = G.mapping(zs, c=None, modes_idx=torch.zeros(1).long().to(device))  # [num_ws, 19, 512]
-
       # Truncating
       truncation_factor = 1 - (trunc_factor.get() / 100)
       ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
@@ -167,6 +182,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
       if shift % w_range == 0 and shift > 0:
         new_z =  torch.randn(2, G.z_dim).to(device)
         new_ws = G.mapping(new_z, c=None, modes_idx=torch.zeros(1).long().to(device))
+        new_ws = interpolate_mix_ws(new_ws, mix_ws)
         new_ws = new_ws * truncation_factor + (1 - truncation_factor) * ws_mean
         ws = torch.cat((ws[1:], new_ws))
         curr_w_idx += 1
@@ -176,7 +192,6 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
       curr_left_borders_idx = torch.zeros(1, device=zs.device).long() + (shift % w_range)  # [0-6] offset in the 3-ws grid, 3 is center image only
 
       img = G.synthesis(curr_ws, ws_context=curr_ws_context, left_borders_idx=curr_left_borders_idx, noise='const')
-
       imgs.append(img[0].cpu().clamp(-1, 1) * 0.5 + 0.5)
 
       if len(imgs) > buffer_size.get():
@@ -186,7 +201,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
       shift += 2
     shuffle_flag.set(False)
 
-def main_session_mock(buffer_size, img_callback, shuffle_flag, input_images, trunc_factor):
+def main_session_mock(buffer_size, img_callback, shuffle_flag, input_images, trunc_factorr, mix_ws):
     eval_width = 1024
     eval_height = 1024
     file_list = glob('mock_images/endless*.jpg')

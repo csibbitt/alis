@@ -19,6 +19,6 @@ if __name__ == "__main__":
     ControlWindow(app)
 
     target =  Eval.main_session if not args.mock else Eval.main_session_mock
-    threading.Thread(name='eval', target=target, args=(app.buffer_size, app.display_window.eval_callback, app.shuffle_flag, app.input_images, app.trunc_factor),  daemon=True).start()
+    threading.Thread(name='eval', target=target, args=(app.buffer_size, app.display_window.eval_callback, app.shuffle_flag, app.input_images, app.trunc_factor, app.mix_ws),  daemon=True).start()
 
     app.mainloop()

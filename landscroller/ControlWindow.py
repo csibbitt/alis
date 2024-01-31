@@ -17,7 +17,7 @@ class ControlWindow():
         self.app = container
         self.app.control_window = self
         self.display_window = self.app.display_window
-        tk_vsi = self.app.register(validate_spinbox_input)
+        self.tk_vsi = self.app.register(validate_spinbox_input)
 
         self.sample_res = 92
 
@@ -46,18 +46,18 @@ class ControlWindow():
         time_value.grid(row=0, column=1, sticky="w")
         mix_and_preview_frame = tk.Frame(main_frame)
         mix_and_preview_frame.grid(row=1, column=1, sticky="w")
-        trunc_factor_spinbox = tk.Spinbox(mix_and_preview_frame, from_=0, to=100, width=5, textvariable=self.app.trunc_factor, validate="key", validatecommand=(tk_vsi, '%P'))
+        trunc_factor_spinbox = tk.Spinbox(mix_and_preview_frame, from_=0, to=100, width=5, textvariable=self.app.trunc_factor, validate="key", validatecommand=(self.tk_vsi, '%P'))
         trunc_factor_spinbox.grid(row=0, column=0, sticky="w")
 
         fps_frame = tk.Frame(main_frame)
         fps_frame.grid(row=2, column=1, columnspan=2, sticky="w")
-        fps_spinbox = tk.Spinbox(fps_frame, from_=1, to=240, width=5, textvariable=self.app.fps, validate="key", validatecommand=(tk_vsi, '%P'))
+        fps_spinbox = tk.Spinbox(fps_frame, from_=1, to=240, width=5, textvariable=self.app.fps, validate="key", validatecommand=(self.tk_vsi, '%P'))
         fps_spinbox.grid(row=0, column=1, sticky="w")
         fps_label = tk.Label(fps_frame, textvariable=self.app.avg_fps)
         fps_label.grid(row=0, column=2, sticky="w")
         buffer_frame = tk.Frame(main_frame)
         buffer_frame.grid(row=3, column=1, columnspan=2, sticky="w")
-        buffer_spinbox = tk.Spinbox(buffer_frame, from_=1, to=100, width=5, textvariable=self.app.buffer_size, validate="key", validatecommand=(tk_vsi, '%P'))
+        buffer_spinbox = tk.Spinbox(buffer_frame, from_=1, to=100, width=5, textvariable=self.app.buffer_size, validate="key", validatecommand=(self.tk_vsi, '%P'))
         buffer_spinbox.grid(row=0, column=1, sticky="w")
         prediction_value = tk.Label(buffer_frame, textvariable=self.app.predictions_string)
         prediction_value.grid(row=0, column=2, sticky="w")
@@ -83,20 +83,26 @@ class ControlWindow():
         self.app.paused.set(not self.app.paused.get())
         self.app.status.set(f'{"" if self.app.paused.get() else "Un"}Paused')
 
-    def add_bookmark(self, pimg, hash):
+    def add_bookmark(self, pimg, hash, ws):
         i = self.bookmark_i
         j = self.bookmark_j
+
+        self.app.mix_ws.append([tk.IntVar(value=0), ws])
+        mix_ws = self.app.mix_ws[-1]
 
         sample_frame = tk.Frame(self.bookmark_frame, highlightbackground="black", highlightthickness=1)
         sample_frame.grid(row=i, column=j)
 
         label = tk.Label(sample_frame, image=pimg)
         label.pimg = pimg
-        label.grid(row=0, column=0)
+        label.ws = ws
         label.status = tk.StringVar(value=hash)
+        label.grid(row=0, column=0, rowspan=2)
 
         button = tk.Button(sample_frame, text="-")
         button.grid(row=0, column=1)
+        mix_spinbox = tk.Spinbox(sample_frame, from_=0, to=100, width=3, textvariable=mix_ws[0], validate="key", validatecommand=(self.tk_vsi, '%P'))
+        mix_spinbox.grid(row=1, column=1, sticky="w")
 
         status_label = tk.Label(sample_frame, textvariable=label.status)
         status_label.grid()
