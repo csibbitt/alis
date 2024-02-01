@@ -15,8 +15,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         # ImageGen and viewport sizes
         self.eval_width = 1024  # ***** Coupled to G()
         self.eval_height = 1024 # ***** Coupled to G()
-        self.width = 1920
-        self.height = self.eval_height
+        self.width = 1280
+        self.height = self.eval_height - 256
 
         self.scale = self.height / self.eval_height
         self.vwidth = self.eval_width * self.app.buffer_size.get() * self.scale
@@ -55,7 +55,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
     def on_resize(self, event):
         if event.height <= 15:
             return
-        self.height = event.height - 15 # 15 is the scrollbar height
+        self.height = event.height #- 15 # 15 is the scrollbar height
         self.scale = self.height / self.eval_height
         img = self.current_img
         self.pimg = ImageTk.PhotoImage(img.resize((int(img.width * self.scale), int(img.height * self.scale))))
@@ -84,6 +84,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         canvas.configure(xscrollcommand=scrollbar_x.set)
 
         self.bind("<Configure>", self.on_resize)
+        self.bind("<space>", self.app.control_window.pause_play_updates())
 
         # Prevent closing
         def on_closing():

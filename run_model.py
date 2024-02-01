@@ -148,28 +148,21 @@ def interpolate_mix_ws(ow, mix_ws):
 
   scale = max(1, sum(strengths)) # to account for sums > 100
   diminished_ow = (1 - sum(strengths) / scale) * ow
-  mix_component = sum(strengths.view(-1,1,1) * tensors / scale)
+  mix_component = sum(strengths.view(-1,1,1) / scale * tensors)
   return diminished_ow.to(device) + mix_component.to(device)
 
-def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_factor, mix_ws):
+def main_session(buffer_size, img_callback, shuffle_flag, trunc_factor, mix_ws):
   while True:
-    if len(input_images) == 0:
-
-      #** Generate some input Z and map them to W = f(Z)
-      num_frames = 5
-      num_frames_per_w = G.synthesis_cfg.patchwise.w_coord_dist // 2
-      num_ws = num_frames // num_frames_per_w + 1
-      w_range = 2 * num_frames_per_w * G.synthesis_cfg.patchwise.grid_size
-      zs = torch.randn(num_ws, G.z_dim).to(device)  # [3, 512]
-      ws = G.mapping(zs, c=None, modes_idx=torch.zeros(1).long().to(device))  # [num_ws, 19, 512]
-      # Truncating
-      truncation_factor = 1 - (trunc_factor.get() / 100)
-      ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
-
-    else:
-      #** Project input_images to Wl, Wc, Wr
-      # ***** How?
-      pass
+    #** Generate some input Z and map them to W = f(Z)
+    num_frames = 5
+    num_frames_per_w = G.synthesis_cfg.patchwise.w_coord_dist // 2
+    num_ws = num_frames // num_frames_per_w + 1
+    w_range = 2 * num_frames_per_w * G.synthesis_cfg.patchwise.grid_size
+    zs = torch.randn(num_ws, G.z_dim).to(device)  # [3, 512]
+    ws = G.mapping(zs, c=None, modes_idx=torch.zeros(1).long().to(device))  # [num_ws, 19, 512]
+    # Truncating
+    truncation_factor = 1 - (trunc_factor.get() / 100)
+    ws = ws * truncation_factor + (1 - truncation_factor) * ws_mean
 
     imgs = []
     shift = 0
@@ -201,7 +194,7 @@ def main_session(buffer_size, img_callback, shuffle_flag, input_images, trunc_fa
       shift += 2
     shuffle_flag.set(False)
 
-def main_session_mock(buffer_size, img_callback, shuffle_flag, input_images, trunc_factorr, mix_ws):
+def main_session_mock(buffer_size, img_callback, shuffle_flag, trunc_factorr, mix_ws):
     eval_width = 1024
     eval_height = 1024
     file_list = glob('mock_images/endless*.jpg')

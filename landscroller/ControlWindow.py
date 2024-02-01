@@ -89,6 +89,7 @@ class ControlWindow():
 
         self.app.mix_ws.append([tk.IntVar(value=0), ws])
         mix_ws = self.app.mix_ws[-1]
+        mix_ws[0].trace('w', self.on_mix_change)
 
         sample_frame = tk.Frame(self.bookmark_frame, highlightbackground="black", highlightthickness=1)
         sample_frame.grid(row=i, column=j)
@@ -111,6 +112,12 @@ class ControlWindow():
         if self.bookmark_j >= 2:
             self.bookmark_j = 0
             self.bookmark_i += 1
+
+    def on_mix_change(self, _, _1, _2):
+        # Discard everything in the buffer so we get a faster response
+        while len(self.app.display_window.img_q) > 0:
+            _ = self.app.display_window.img_q.popleft()
+
 
 def validate_spinbox_input(new_value):
     if new_value == '':

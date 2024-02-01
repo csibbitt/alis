@@ -14,7 +14,6 @@ class App(tk.Tk):
         self.buffer_size = tk.IntVar(value=int(canvas_width / patch_width) + 2)
         self.fps = tk.IntVar(value=24)
         self.input_hash = tk.StringVar(value='0s')
-        self.input_images = []
         self.trunc_factor = tk.IntVar(value=10)
         self.paused = tk.BooleanVar(value=False)
         self.predictions_string = tk.StringVar(value='0-0')
