@@ -47,7 +47,7 @@ def build_model():
   ws_mean = G.mapping(z_mean, c=None, modes_idx=torch.zeros(1000).long().to(device)).mean(dim=0, keepdim=True)
 
 
-def generate_neighbor_ws(num, ws, dist=0.8):
+def generate_neighbor_ws(num, ws, dist=0.95):
   global ws_mean
 
   ws_list = []
