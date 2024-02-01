@@ -20,6 +20,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
 
         self.scale = self.height / self.eval_height
         self.vwidth = self.eval_width * self.app.buffer_size.get() * self.scale
+        self.vheight = self.height - 15
 
         # Instance vars
         self.last_buffer_size = -1
@@ -52,11 +53,22 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         self.current_img = img
         time.sleep(0.25)
 
-    def on_resize(self, event):
-        if event.height <= 15:
+    def on_configure(self, event):
+        if event.height < 128 or event.width <128:
             return
-        self.height = event.height #- 15 # 15 is the scrollbar height
-        self.scale = self.height / self.eval_height
+        # Cancel any previously scheduled resizing event
+        if hasattr(self, "_resize_after_id"):
+            self.after_cancel(self._resize_after_id)
+        # Schedule the resizing event to occur after a short delay (e.g., 200 milliseconds)
+        self._resize_after_id = self.after(200, self.on_resize, event)
+
+    def on_resize(self, event):
+        if event.height == self.height and event.width == self.width:
+            return
+        self.height = event.height
+        self.vheight = event.height - 15 # 15 is the scrollbar height
+        self.width = event.width
+        self.scale = self.vheight / self.eval_height
         img = self.current_img
         self.pimg = ImageTk.PhotoImage(img.resize((int(img.width * self.scale), int(img.height * self.scale))))
         self.adjust_canvas_width(self.app.buffer_size.get())
@@ -67,13 +79,13 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         new_canvas_vwidth = buf_siz * self.eval_width * self.scale
         #if new_canvas_vwidth != self.vwidth:
         self.vwidth = new_canvas_vwidth
-        self.children['!canvas'].configure(width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
+        self.children['!canvas'].configure(width=self.width, height=self.vheight, scrollregion=(0, 0, self.vwidth, self.vheight))
 
     def run(self):
         self.title("landscroller - Display")
         self.geometry(f'{self.width}x{self.height}+0+0')
 
-        canvas = tk.Canvas(self, width=self.width, height=self.height, scrollregion=(0, 0, self.vwidth, self.height))
+        canvas = tk.Canvas(self, width=self.width, height=self.vheight, scrollregion=(0, 0, self.vwidth, self.vheight))
         canvas.pack(fill="both", expand=True)
 
         canvas.image = ImageTk.PhotoImage(file='startup.jpg')  # Keep a reference to avoid garbage collection
@@ -83,8 +95,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         scrollbar_x.pack(side="bottom", fill="x")
         canvas.configure(xscrollcommand=scrollbar_x.set)
 
-        self.bind("<Configure>", self.on_resize)
-        self.bind("<space>", self.app.control_window.pause_play_updates())
+        self.bind("<Configure>", self.on_configure)
+        self.bind("<space>", lambda _: self.app.control_window.pause_play_updates())
 
         # Prevent closing
         def on_closing():
