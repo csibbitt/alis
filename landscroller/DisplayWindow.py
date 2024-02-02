@@ -176,8 +176,8 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         name = f'outputs/view-{int(self.start_time)}-{self.app.input_hash.get()}-n{self.nn}-({self.app.predictions_string.get()}).jpg'
         cw = self.children['!canvas'].winfo_width()
         with self.last_img_lock:
-            start_col = self.children['!canvas'].xview()[0] * self.current_img.width
-            cropped = self.current_img.crop( (start_col, 0, start_col + (cw / self.scale), self.eval_height) )
+            start_col = self.children['!canvas'].xview()[0] * self.last_img.width
+            cropped = self.last_img.crop( (start_col, 0, start_col + (cw / self.scale), self.eval_height) )
             cropped.save(name)
             preview_save(cropped, name)
         self.app.status.set('Saved viewport')
@@ -189,7 +189,7 @@ class DisplayWindow(tk.Toplevel, threading.Thread):
         name = f'outputs/buf-{int(self.start_time)}-{self.app.input_hash.get()}-n{self.nn}-({self.app.predictions_string.get()}).jpg'
         with self.last_img_lock:
             self.current_img.save(name)
-            preview_save(self.current_img, name)
+            preview_save(self.last_img, name)
         self.app.status.set('Saved buffer')
         self.app.paused.set(prev_pause)
 
