@@ -1,6 +1,12 @@
 ### About
-This repo contains the official implementation of the [Aligning Latent and Image Spaces to Connect the Unconnectable](https://arxiv.org/abs/2104.06954) paper.
+This repo contains a fork of the official implementation of the [Aligning Latent and Image Spaces to Connect the Unconnectable](https://arxiv.org/abs/2104.06954) paper.
 It is a GAN model which can generate infinite images of diverse and complex scenes.
+
+I have added a tk gui that implements an infinite landscape scroller for exploration and snapshotting of this awesome generator.
+
+![image](https://github.com/csibbitt/alis/assets/5091372/3032e537-52a2-4e67-9a2a-f7852f76083d)
+
+Everything below is the original README.
 
 <div style="text-align:center">
 <img src="https://user-images.githubusercontent.com/3128824/116132029-bc294c00-a6d5-11eb-9bd4-ab125b1508b7.gif" alt="ALIS generation example"/>
